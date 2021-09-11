@@ -32,7 +32,7 @@ public class ProductController {
             .filter(product -> Integer.parseInt(product.getId()) > Integer.parseInt(id))
             .take(5)
             .delayElements(Duration.ofMillis(20))
-            .doOnTerminate(() -> System.out.println("Related in : " + (System.currentTimeMillis() - start)));
+            .doOnTerminate(() -> System.out.println("Related of "+id+" in : " + (System.currentTimeMillis() - start)));
   }
 
   @GetMapping(value = "/related")
@@ -45,7 +45,7 @@ public class ProductController {
               .collectList()
             .map(list -> new ProductWithRelated(id, list)))
             .delayElements(Duration.ofMillis(20))
-            .doOnTerminate(() -> System.out.println("Related in : " + (System.currentTimeMillis() - start)));
+            .doOnTerminate(() -> System.out.println("Related of "+ids+" in : " + (System.currentTimeMillis() - start)));
   }
 
   @GetMapping(value = "/{id}/stocks")
@@ -53,7 +53,7 @@ public class ProductController {
     long start = System.currentTimeMillis();
     return Mono.just(Integer.parseInt(id) - 5)
             .delayElement(Duration.ofMillis(50))
-            .doOnTerminate(() -> System.out.println("Stocks in : " + (System.currentTimeMillis() - start)));
+            .doOnTerminate(() -> System.out.println("Stocks of "+id+" in : " + (System.currentTimeMillis() - start)));
   }
 
   @GetMapping(value = "/stocks")
@@ -62,7 +62,7 @@ public class ProductController {
     return Flux.fromIterable(ids)
             .map(id -> new ProductWithQuantity(id, Integer.parseInt(id) - 5))
             .delayElements(Duration.ofMillis(10))
-            .doOnTerminate(() -> System.out.println("Stocks in : " + (System.currentTimeMillis() - start)));
+            .doOnTerminate(() -> System.out.println("Stocks of "+ids+" in : " + (System.currentTimeMillis() - start)));
   }
 
   private Flux<Product> generate() {

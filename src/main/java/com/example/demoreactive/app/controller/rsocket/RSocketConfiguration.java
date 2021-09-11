@@ -9,6 +9,8 @@ import reactor.util.retry.Retry;
 
 import java.time.Duration;
 
+import static io.rsocket.frame.decoder.PayloadDecoder.ZERO_COPY;
+
 @Configuration
 @Slf4j
 public class RSocketConfiguration {
@@ -21,7 +23,7 @@ public class RSocketConfiguration {
                     .retry(
                             Retry.fixedDelay(Long.MAX_VALUE, Duration.ofSeconds(1))
                                     .doBeforeRetry(s -> log.debug("Disconnected. Trying to resume...")));
-    return rSocketServer -> rSocketServer.resume(resume);
+    return rSocketServer -> rSocketServer.resume(resume).payloadDecoder(ZERO_COPY);
   }
 
 
