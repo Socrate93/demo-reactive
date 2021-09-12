@@ -4,85 +4,87 @@ import com.example.demoreactive.domain.Product;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.ReactiveMongoOperations;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.List;
-import java.util.Set;
+
+import static org.springframework.data.mongodb.core.query.Criteria.*;
+import static org.springframework.data.mongodb.core.query.Query.*;
 
 @RestController
 @RequestMapping("/products")
+@RequiredArgsConstructor
 public class ProductController {
 
-  private Flux<Product> products = generate();
+  private final ReactiveMongoOperations operations;
 
   @GetMapping
   public Flux<Product> getProducts() {
     long start = System.currentTimeMillis();
-    return products.delayElements(Duration.ofMillis(5))
-            .doOnTerminate(() -> System.out.println("Products in : " + (System.currentTimeMillis() - start)));
+    return operations.findAll(Product.class)
+            .take(40)
+            //.doOnTerminate(() -> System.out.println("Products all in : " + (System.currentTimeMillis() - start)))
+            ;
   }
 
-  @GetMapping(value = "/{id}/related")
-  public Flux<Product> getProductsRelatedTo(@PathVariable String id) {
+  @GetMapping(value = "/{id}")
+  public Mono<Product> getProduct(@PathVariable String id) {
     long start = System.currentTimeMillis();
-    return products
-            .filter(product -> Integer.parseInt(product.getId()) > Integer.parseInt(id))
-            .take(5)
-            .delayElements(Duration.ofMillis(20))
-            .doOnTerminate(() -> System.out.println("Related of "+id+" in : " + (System.currentTimeMillis() - start)));
+    return operations.findById(id, Product.class)
+            //.doOnTerminate(() -> System.out.println("Product in : " + (System.currentTimeMillis() - start)))
+            ;
   }
 
-  @GetMapping(value = "/related")
-  public Flux<ProductWithRelated> getProductsRelatedTo(@RequestParam Set<String> ids) {
+  @PostMapping(value = "/searches")
+  public Flux<Product> getProductsByIdsFlux(@RequestBody List<String> ids) {
     long start = System.currentTimeMillis();
-    return Flux.fromIterable(ids)
-            .flatMap(id -> products
-              .filter(product -> Integer.parseInt(product.getId()) > Integer.parseInt(id))
-              .take(5)
-              .collectList()
-            .map(list -> new ProductWithRelated(id, list)))
-            .delayElements(Duration.ofMillis(20))
-            .doOnTerminate(() -> System.out.println("Related of "+ids+" in : " + (System.currentTimeMillis() - start)));
+    return operations.find(query(where("_id").in(ids)), Product.class)
+            //.doOnTerminate(() -> System.out.println("Products by ids in : " + (System.currentTimeMillis() - start)))
+            ;
   }
 
-  @GetMapping(value = "/{id}/stocks")
-  public Mono<Integer> getProductStock(@PathVariable String id) {
+  @PostMapping(value = "/related/searches")
+  public Flux<ProductWithRelated> getProductsRelatedTo(@RequestBody List<String> ids) {
     long start = System.currentTimeMillis();
-    return Mono.just(Integer.parseInt(id) - 5)
-            .delayElement(Duration.ofMillis(50))
-            .doOnTerminate(() -> System.out.println("Stocks of "+id+" in : " + (System.currentTimeMillis() - start)));
+    return operations.find(query(where("_id").in(ids)), ProductWithRelated.class)
+            //.doOnTerminate(() -> System.out.println("Related in : " + (System.currentTimeMillis() - start)))
+            ;
   }
 
-  @GetMapping(value = "/stocks")
-  public Flux<ProductWithQuantity> getProductsStocks(@RequestParam Set<String> ids) {
+  @PostMapping(value = "/stocks/searches")
+  public Flux<ProductWithQuantity> getProductsStocks(@RequestBody List<String> ids) {
     long start = System.currentTimeMillis();
-    return Flux.fromIterable(ids)
-            .map(id -> new ProductWithQuantity(id, Integer.parseInt(id) - 5))
-            .delayElements(Duration.ofMillis(10))
-            .doOnTerminate(() -> System.out.println("Stocks of "+ids+" in : " + (System.currentTimeMillis() - start)));
-  }
-
-  private Flux<Product> generate() {
-    return Flux.range(0, 20)
-            .map(i -> new Product(String.valueOf(i), "Product "+i));
+    return operations.find(query(where("_id").in(ids)), ProductWithQuantity.class)
+            //.doOnTerminate(() -> System.out.println("Stocks in : " + (System.currentTimeMillis() - start)))
+            ;
   }
 
   @Data
   @NoArgsConstructor
   @AllArgsConstructor
+  @Document
   private static class ProductWithRelated {
+    @Id
     private String id;
-    private List<Product> products;
+    private List<String> products;
   }
 
   @Data
   @NoArgsConstructor
   @AllArgsConstructor
+  @Document
   private static class ProductWithQuantity {
-    private String id;
+    @Id private String id;
     private Integer stock;
   }
+
 }

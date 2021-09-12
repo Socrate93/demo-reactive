@@ -16,6 +16,7 @@ import org.springframework.stereotype.Controller;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import javax.annotation.PostConstruct;
 import java.time.Duration;
@@ -34,16 +35,9 @@ public class RSocketOfferController {
   public Flux<Product> getProducts() {
     long start = System.currentTimeMillis();
     return operations.findAll(Product.class)
-            .take(20)
-            //.doOnTerminate(() -> System.out.println("Products all in : " + (System.currentTimeMillis() - start)))
-            ;
-  }
-
-  @MessageMapping(value = "products.single")
-  public Mono<Product> getProduct(String id) {
-    long start = System.currentTimeMillis();
-    return operations.findById(id, Product.class)
-            //.doOnTerminate(() -> System.out.println("Product in : " + (System.currentTimeMillis() - start)))
+            .take(40)
+            //.log()
+            //.doOnTerminate(() -> logResponseTime("Products all", start, 10L))
             ;
   }
 
@@ -52,40 +46,20 @@ public class RSocketOfferController {
     long start = System.currentTimeMillis();
     return ids.collectList()
             .flatMapMany(_ids -> operations.find(Query.query(Criteria.where("_id").in(_ids)), Product.class))
+            //.log()
+            //.doOnTerminate(() -> logResponseTime("Products by ids in", start, 10L))
             //.doOnTerminate(() -> System.out.println("Products by ids in : " + (System.currentTimeMillis() - start)))
             ;
-  }
-
-  @MessageMapping(value = "products.batch")
-  public Flux<Product> getProductsByIdsList(List<String> ids) {
-    long start = System.currentTimeMillis();
-    return operations.find(Query.query(Criteria.where("_id").in(ids)), Product.class)
-            .doOnTerminate(() -> System.out.println("Products in : " + (System.currentTimeMillis() - start)));
-  }
-
-  @MessageMapping(value = "products.related")
-  public Flux<String> getProductsRelatedTo(String id) {
-    long start = System.currentTimeMillis();
-    return operations.findById(id, ProductWithRelated.class)
-            .flatMapMany(productWithRelated -> Flux.fromIterable(productWithRelated.getProducts()))
-            .doOnTerminate(() -> System.out.println("Related of "+id+" in : " + (System.currentTimeMillis() - start)));
   }
 
   @MessageMapping(value = "products.related.batch")
   public Flux<ProductWithRelated> getProductsRelatedTo(Flux<String> ids) {
     long start = System.currentTimeMillis();
-    return ids
-            .concatMap(id -> operations.findById(id, ProductWithRelated.class))
+    return ids.collectList()
+            .flatMapMany(_ids -> operations.find(Query.query(Criteria.where("_id").in(_ids)), ProductWithRelated.class))
+            //.log()
+            //.doOnTerminate(() -> logResponseTime("Related", start, 10L))
             //.doOnTerminate(() -> System.out.println("Related in : " + (System.currentTimeMillis() - start)))
-            ;
-  }
-
-  @MessageMapping(value = "products.stock")
-  public Mono<Integer> getProductStock(String id) {
-    long start = System.currentTimeMillis();
-    return operations.findById(id, ProductWithQuantity.class)
-            .map(ProductWithQuantity::getStock)
-            //.doOnTerminate(() -> System.out.println("Stock of "+id+" in : " + (System.currentTimeMillis() - start)))
             ;
   }
 
@@ -94,13 +68,17 @@ public class RSocketOfferController {
     long start = System.currentTimeMillis();
     return ids.collectList()
             .flatMapMany(_ids -> operations.find(Query.query(Criteria.where("_id").in(_ids)), ProductWithQuantity.class))
+            //.log()
+            //.doOnTerminate(() -> logResponseTime("Stocks", start, 10L))
             //.doOnTerminate(() -> System.out.println("Stocks in : " + (System.currentTimeMillis() - start)))
             ;
   }
 
-  private Flux<Product> generate() {
-    return Flux.range(0, 20)
-            .map(i -> new Product(String.valueOf(i), "Product "+i));
+  private void logResponseTime(String name, long start, long max) {
+    long time = System.currentTimeMillis() - start;
+    if (time > max) {
+      System.out.println(name+ " : "+time);
+    }
   }
 
   @Data
